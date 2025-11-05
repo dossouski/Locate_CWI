@@ -1,5 +1,5 @@
 # Project Title: 
-Automating data extraction from city directories: Locating historical city-waste incineration sites in Durham, NC.
+Automating data extraction from archives: Locating historical city-waste incineration sites in Durham, NC using city directories and Sanborn Fire Insurance maps
 
 ## Team Members
 - Anselme Dossou

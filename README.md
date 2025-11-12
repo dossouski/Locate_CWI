@@ -1,5 +1,4 @@
-# Project Title: 
-Automating data extraction from archives: Locating historical city-waste incineration sites in Durham, NC using city directories and Sanborn Fire Insurance maps
+# Automating data extraction from archives: Locating historical city-waste incineration sites in Durham, NC using city directories and Sanborn Fire Insurance maps
 
 ## Team Members
 - Anselme Dossou
@@ -30,10 +29,13 @@ Other packages (a lot more packages are needed to complete all the steps but we 
 
 ## Planned methods/approach
 For this project we are planning to use similar methods as in Samuel Bell et al., 2020. The pipeline consists of the following discrete steps: grayscale thresholding, ad removal, margin cropping, cloumn chopping, line chopping, Optical Character Recognition, header identification, entry concatenation, text cleaning , address parsing, street matching and geocoding.  
+
 ## Expected outcomes
 The project will yield a machine learning method able to read with high accuracy through pdf files. 
+
 ## Any other relevant information, images/tables, references, etc.
-```{image} Durham_cd.jpg
+
+```{image} images/Durham_cd.jpg
 :width: 600px
 :align: center
 ```

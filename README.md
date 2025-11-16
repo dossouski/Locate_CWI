@@ -39,6 +39,7 @@ The project will yield a machine learning method able to read with high accuracy
 :width: 600px
 :align: center
 ```
+
 ## References
 Bell S, Marlow T, Wombacher K, Hitt A, Parikh N, Zsom A, et al. (2020) Automated data extraction from historical city directories: The rise and fall of mid-century gas stations in Providence, RI. PLoS ONE 15(8): e0220219. https://doi.org/10.1371/journal.pone.0220219
 

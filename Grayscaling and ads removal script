@@ -1,0 +1,126 @@
+import glob
+import os
+import re
+import cv2
+import numpy as np
+import pandas as pd
+import time
+from multiprocessing import Pool
+
+# Natural sort helper
+def naturalSort(String_):
+    return [int(s) if s.isdigit() else s for s in re.split(r'(\d+)', String_)]
+
+# Function to remove ads from a single image
+def removeAds(im_bw, file, do_diagnostics, perimeter_cutoff):
+    chop_file = os.path.basename(file).partition('.jpg')[0]
+    height, width = im_bw.shape[:2]
+
+    sf = float(height + width)/float(13524 + 9475)
+    cv2.rectangle(im_bw, (0, 0), (width, height), (255, 255, 255), int(150*sf))
+    im_bw_copy = im_bw.copy()
+
+    if do_diagnostics:
+        if not os.path.exists('no_ads'):
+            os.makedirs('no_ads')
+        cv2.imwrite(os.path.join('no_ads', chop_file + '_bw_test.jpg'), im_bw)
+
+    blank_image = np.zeros((height, width, 3), np.uint8)
+    white_image = 255.0 * np.ones((height, width), np.uint8)
+    minContour = perimeter_cutoff * sf
+
+    contours, hierarchy = cv2.findContours(im_bw_copy, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+    for cnt in contours:
+        perimeter = cv2.arcLength(cnt, True)
+        x, y, w, h = cv2.boundingRect(cnt)
+        contourA = (2*(w+h))**2 / max(perimeter,1)
+        if contourA > minContour:
+            cv2.drawContours(blank_image, [cnt], -1, (0,255,0), 3)
+            bottom = max([vertex[0][1] for vertex in cnt])
+            top = min([vertex[0][1] for vertex in cnt])
+            left = min([vertex[0][0] for vertex in cnt])
+            right = max([vertex[0][0] for vertex in cnt])
+            if (w > (width / 2)) and (bottom < (height * 0.75)):
+                drawn_cnt = cv2.drawContours(255.0 * np.ones((height, width), np.uint8), [cnt], -1, (0,0,0), -1)
+                y = bottom
+                while (cv2.countNonZero(drawn_cnt[y,:]) > 0.75*width) and (y > 0):
+                    y -= 1
+                if y < top:
+                    y = bottom
+                cv2.rectangle(im_bw, (0, 0), (width, y), (255, 255, 255), -1)
+                cv2.drawContours(im_bw, [cnt], -1, (255,255,255), -1)
+            if (w > (width / 2)) and (top > (height * 0.85)):
+                drawn_cnt = cv2.drawContours(255.0 * np.ones((height,width), np.uint8), [cnt], -1, (0,0,0), -1)
+                y = top
+                while (cv2.countNonZero(drawn_cnt[y,:]) > 0.75*width) and (y < (height - 1)):
+                    y += 1
+                if y > bottom:
+                    y = top
+                cv2.rectangle(im_bw, (0, top), (width, height), (255,255,255), -1)
+                cv2.drawContours(im_bw, [cnt], -1, (255,255,255), -1)
+            if (w*h) < 0.9 * width * height:
+                cv2.drawContours(white_image, [cnt], -1, (0,0,0), -1)
+                if h > (0.15 * float(height)) and right < (0.25 * float(width)):
+                    drawn_cnt = cv2.drawContours(255.0 * np.ones((height,width), np.uint8), [cnt], -1, (0,0,0), -1)
+                    x = right
+                    while (cv2.countNonZero(drawn_cnt[:, x]) > 0.85*height) and (x > 0):
+                        x -= 1
+                    if x < left:
+                        x = right
+                    cv2.rectangle(im_bw, (0, 0), (x, height), (255, 255, 255), -1)
+                    cv2.drawContours(im_bw, [cnt], -1, (255, 255, 255), -1)
+                elif h > (0.15 * float(height)) and left > (0.75 * float(width)):
+                    drawn_cnt = cv2.drawContours(255.0 * np.ones((height, width), np.uint8), [cnt], -1, (0,0,0), -1)
+                    x = left
+                    while (cv2.countNonZero(drawn_cnt[:, x]) > 0.85*height) and (x < (width - 1)):
+                        x += 1
+                    if x > right:
+                        x = left
+                    cv2.rectangle(im_bw, (x, 0), (width, height), (255, 255, 255), -1)
+                    cv2.drawContours(im_bw, [cnt], -1, (255, 255, 255), -1)
+                else:
+                    cv2.drawContours(im_bw, [cnt], -1, (255, 255, 255), -1)
+    if do_diagnostics:
+        cv2.imwrite(os.path.join('no_ads', chop_file + '_white.jpg'), white_image)
+        cv2.imwrite(os.path.join('no_ads', chop_file + '_contours.jpg'), blank_image)
+    return im_bw
+
+# Converts image to binary black/white for ad filtering
+def get_binary(file, do_diagnostics):
+    original = cv2.imread(file, 0)  # Grayscale read
+    if do_diagnostics:
+        if not os.path.exists('no_ads'):
+            os.makedirs('no_ads')
+        chop_file = os.path.basename(file).partition('.jpg')[0]
+        cv2.imwrite(os.path.join('no_ads', chop_file + '_gray.jpg'), original)
+    # Use a fixed threshold (can be tuned or adapted as needed)
+    _, im_bw = cv2.threshold(original, 128, 255, cv2.THRESH_BINARY)
+    return im_bw
+
+def process_image(args):
+    file, do_diagnostics, perimeter_cutoff = args
+    im_bw = get_binary(file, do_diagnostics)
+    processed_img = removeAds(im_bw, file, do_diagnostics, perimeter_cutoff)
+    # Save final processed image in no_ads folder
+    if not os.path.exists('no_ads'):
+        os.makedirs('no_ads')
+    chop_file = os.path.basename(file).partition('.jpg')[0]
+    output_file = os.path.join('no_ads', chop_file + '_no_ads.jpg')
+    cv2.imwrite(output_file, processed_img)
+    print(f"Processed and saved: {output_file}")
+
+def batch_process_images(folder_path, do_diagnostics=False, perimeter_cutoff=2000, use_multiprocessing=False, pool_num=4):
+    # Get all jpg files sorted naturally
+    all_files = sorted(glob.glob(os.path.join(folder_path, '*.jpg')), key=naturalSort)
+    args_list = [(file, do_diagnostics, perimeter_cutoff) for file in all_files]
+    if use_multiprocessing:
+        pool = Pool(pool_num)
+        pool.map(process_image, args_list)
+    else:
+        for args in args_list:
+            process_image(args)
+
+# Parameters & folder path
+folder_path = r"C:\Users\anseb\Downloads\FinalProject\City directories\With Incinerator"
+batch_process_images(folder_path, do_diagnostics=True, perimeter_cutoff=2000, use_multiprocessing=False)
